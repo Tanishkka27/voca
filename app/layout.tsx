@@ -1,6 +1,7 @@
 import './globals.css'
 import React from 'react'
 import SiteHeader from '@/components/site-header'
+import Providers from './providers'
 
 export const metadata = {
   title: 'Voca',
@@ -11,8 +12,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen bg-background text-foreground">
-        <SiteHeader />
-        <main className="container mx-auto px-4">{children}</main>
+        <Providers>
+          <SiteHeader />
+          <main className="container mx-auto px-4">{children}</main>
+        </Providers>
       </body>
     </html>
   )

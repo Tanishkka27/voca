@@ -1,4 +1,5 @@
 import React from 'react'
+import GithubLoginButton from '@/components/GithubLoginButton'
 
 export default function HomePage() {
   return (
@@ -6,6 +7,9 @@ export default function HomePage() {
       <div className="mx-auto text-center py-24">
         <h1 className="text-5xl font-extrabold">Voca</h1>
         <p className="mt-4 text-xl text-gray-600">Turn your product work into authentic content</p>
+        <div className="mt-6">
+          <GithubLoginButton />
+        </div>
       </div>
     </section>
   )
