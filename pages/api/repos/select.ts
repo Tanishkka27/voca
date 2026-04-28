@@ -22,7 +22,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!userId) return res.status(403).json({ error: 'Unable to resolve user' })
 
     const record = await saveSelectedRepo(userId, repoName, repoFullName)
-    return res.status(201).json({ repo: record })
+    // Provide redirect hint for client to navigate to commits page
+    res.setHeader('Location', '/commits')
+    return res.status(201).json({ repo: record, redirect: '/commits' })
   } catch (e: any) {
     return res.status(500).json({ error: e.message || 'DB error' })
   }
