@@ -29,12 +29,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('ALL REPOS: <error fetching repos>', e)
   }
 
-  const repo = await prisma.repo.findFirst({ where: { userId: userLookup.id ?? (session.user.email ?? (session.user as any).githubId) } })
+  // Resolve user record from DB if session.user.id missing
+  let currentUser = null
+  if (userLookup.id) {
+    currentUser = await prisma.user.findUnique({ where: { id: userLookup.id } })
+  } else if (userLookup.email) {
+    currentUser = await prisma.user.findUnique({ where: { email: userLookup.email } })
+  } else if (userLookup.githubId) {
+    currentUser = await prisma.user.findUnique({ where: { githubId: userLookup.githubId } })
+  }
+
+  if (!currentUser) {
+    console.log('Could not resolve current user from session:', session.user)
+    return res.status(403).json({ error: 'Unable to resolve user' })
+  }
+
+  // Try to find selected repo for this user
+  let repo = await prisma.repo.findFirst({ where: { userId: currentUser.id } })
+  if (!repo) {
+    // No repo linked to this user — attempt to find a repo by full name and re-link it
+    const candidate = await prisma.repo.findFirst({ where: { repoFullName: { contains: '' } } })
+    // If a matching repoFullName exists we can choose to relink; safer approach: try to find exact repoFullName from recent entries
+    const all = await prisma.repo.findMany({ where: { repoFullName: { contains: '' } }, take: 50 })
+    // Log and attempt to find a repo that matches the actor's GitHub username if available
+    console.log('Attempting to auto-relink: user=', currentUser.id, 'session.user=', session.user)
+    if ((session.user as any).username) {
+      const match = await prisma.repo.findFirst({ where: { repoFullName: { contains: (session.user as any).username } } })
+      if (match) {
+        console.log('Auto-relinking repo', match.repoFullName, 'to user', currentUser.id)
+        await prisma.repo.update({ where: { id: match.id }, data: { userId: currentUser.id } })
+        repo = match
+      }
+    }
+  }
+
   if (!repo) return res.status(404).json({ error: 'No repository selected' })
 
   // Step 3: compare is visible in logs above
 
-  const user = await prisma.user.findUnique({ where: userLookup })
+  const user = currentUser
   if (!user || !user.accessToken) return res.status(403).json({ error: 'Missing token' })
 
   try {
