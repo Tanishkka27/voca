@@ -8,10 +8,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const session = await getServerSession(req, res, authOptions as any)
   if (!session || !session.user) return res.status(401).json({ error: 'Unauthorized' })
 
-  const repo = await prisma.repo.findFirst({ where: { userId: session.user.id } })
+  // Resolve user lookup robustly: prefer id, fall back to email or githubId
+  const userLookup: any = {}
+  if (session.user.id) userLookup.id = session.user.id
+  else if (session.user.email) userLookup.email = session.user.email
+  else if ((session.user as any).githubId) userLookup.githubId = (session.user as any).githubId
+
+  const repo = await prisma.repo.findFirst({ where: { userId: userLookup.id ?? (session.user.email ?? (session.user as any).githubId) } })
   if (!repo) return res.status(404).json({ error: 'No repository selected' })
 
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } })
+  const user = await prisma.user.findUnique({ where: userLookup })
   if (!user || !user.accessToken) return res.status(403).json({ error: 'Missing token' })
 
   try {
