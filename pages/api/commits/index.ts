@@ -44,36 +44,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(403).json({ error: 'Unable to resolve user' })
   }
 
-  // Try to find selected repo for this user
-  let repo = await prisma.repo.findFirst({ where: { userId: currentUser.id } })
-  if (!repo) {
-    // No repo linked to this user — attempt to find a repo by full name and re-link it
-    const candidate = await prisma.repo.findFirst({ where: { repoFullName: { contains: '' } } })
-    // If a matching repoFullName exists we can choose to relink; safer approach: try to find exact repoFullName from recent entries
-    const all = await prisma.repo.findMany({ where: { repoFullName: { contains: '' } }, take: 50 })
-    // Log and attempt to find a repo that matches the actor's GitHub username if available
-    console.log('Attempting to auto-relink: user=', currentUser.id, 'session.user=', session.user)
-    if ((session.user as any).username) {
-      const match = await prisma.repo.findFirst({ where: { repoFullName: { contains: (session.user as any).username } } })
-      if (match) {
-        console.log('Auto-relinking repo', match.repoFullName, 'to user', currentUser.id)
-        await prisma.repo.update({ where: { id: match.id }, data: { userId: currentUser.id } })
-        repo = match
-      }
-    }
+  // If owner/repo provided as query parameters, use them; otherwise fall back to user's selected repo in DB
+  const { owner, repo: repoParam } = req.query as { owner?: string; repo?: string }
+
+  let repoFullName: string | null = null
+  if (owner && repoParam) {
+    repoFullName = `${owner}/${repoParam}`
+  } else {
+    // Try to find selected repo for this user
+    let repo = await prisma.repo.findFirst({ where: { userId: currentUser.id } })
+    if (!repo) return res.status(404).json({ error: 'No repository selected' })
+    repoFullName = repo.repoFullName
   }
-
-  if (!repo) return res.status(404).json({ error: 'No repository selected' })
-
-  // Step 3: compare is visible in logs above
 
   const user = currentUser
   if (!user || !user.accessToken) return res.status(403).json({ error: 'Missing token' })
 
   try {
-    const commits = await fetchCommits(repo.repoFullName, user.accessToken)
+    const commits = await fetchCommits(repoFullName, user.accessToken)
     const out = commits.map((c) => ({ message: c.message, date: c.date, author: c.author_login }))
-    return res.status(200).json({ commits: out })
+    return res.status(200).json({ commits: out, repoFullName })
   } catch (e: any) {
     return res.status(502).json({ error: e.message || 'Failed to fetch commits' })
   }

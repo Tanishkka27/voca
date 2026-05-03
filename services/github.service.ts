@@ -23,6 +23,11 @@ export async function fetchUserRepos(accessToken: string) {
 }
 
 export async function saveSelectedRepo(userId: string, repoName: string, repoFullName: string) {
+  // If a repo record already exists for this user, update it. Otherwise create one.
+  const existing = await prisma.repo.findFirst({ where: { userId } })
+  if (existing) {
+    return prisma.repo.update({ where: { id: existing.id }, data: { repoName, repoFullName } })
+  }
   return prisma.repo.create({ data: { userId, repoName, repoFullName } })
 }
 

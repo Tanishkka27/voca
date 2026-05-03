@@ -22,9 +22,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!userId) return res.status(403).json({ error: 'Unable to resolve user' })
 
     const record = await saveSelectedRepo(userId, repoName, repoFullName)
-    // Provide redirect hint for client to navigate to commits page
-    res.setHeader('Location', '/commits')
-    return res.status(201).json({ repo: record, redirect: '/commits' })
+    // Provide redirect hint for client to navigate to the dynamic commits page (owner/repo/commits)
+    const redirectPath = `/${repoFullName}/commits`
+    res.setHeader('Location', redirectPath)
+    return res.status(201).json({ repo: record, redirect: redirectPath })
   } catch (e: any) {
     return res.status(500).json({ error: e.message || 'DB error' })
   }

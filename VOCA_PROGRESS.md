@@ -94,3 +94,100 @@
 - Cache repo list to reduce GitHub API calls
 - Add retry handling for GitHub API failures
 
+## EPIC 1 - Milestone 1.4 (Repo Selection Redirects & Commits)
+
+### Completed:
+
+* `RepoSelector` now navigates to the dynamic commits route after selection (`/${"owner"}/${"repo"}/commits`).
+* `POST /api/repos/select` returns a `redirect` hint and `Location` header pointing to `/{owner}/{repo}/commits`.
+* `saveSelectedRepo` now updates existing selection for a user (upsert-like behavior) to avoid duplicate records.
+* `GET /api/commits` accepts `?owner=...&repo=...` and returns `repoFullName` with commits so clients can route to the dynamic page.
+* Added dynamic commits page at `/[owner]/[repo]/commits` to display commits for any repo.
+* Legacy `/commits` page now redirects to the dynamic route when a selected repo exists.
+
+### Notes / Fixes:
+
+* Fixed an issue where previously-selected repos would persist and always show the same repo — selection now updates the user's saved record.
+* Addressed 404s by adding the dynamic commits route and ensuring API returns the repo path for client-side navigation.
+
+### Status:
+
+✅ Implemented — manual verification recommended
+
+### Quick Verification Steps:
+
+1. Start the dev server:
+```bash
+npm run dev
+```
+2. Sign in and visit `/dashboard`.
+3. Choose a repository and click "Confirm Selection" — you should be redirected to `/{owner}/{repo}/commits`.
+4. Visiting `/commits` will redirect to the selected repo's dynamic commits page if a selection exists.
+
+### Next Actions (optional):
+
+- Add unit/integration tests for selection and redirect flows.
+- Harden error handling for GitHub API rate limits.
+- Add UI feedback while redirecting (toast/snackbar).
+
+## EPIC 2 - Milestone 2.3.1 (Session-Based Activity Grouping)
+
+### Completed:
+
+* Replaced time-window filtering (24h) with session-based grouping
+* Implemented `detectLatestSession()` function for intelligent commit grouping
+  - Groups commits based on time proximity (3-hour window)
+  - Respects session size limits (max 8 commits, max 4-hour gap)
+* Implemented `extractSessionTimeRange()` helper to calculate session time boundaries
+* Updated `generateActivitySummary()` to use sessions instead of fixed time windows
+* Integrated PR filtering based on session time range (mergedAt/createdAt within range)
+* Maintained noise filtering (trivial messages, duplicates)
+* Proper edge case handling: fallback to PRs if no commits, return null if both empty
+* Full TypeScript type safety with `SessionTimeRange` and proper return types
+
+### Algorithm Details:
+
+Session Detection:
+* Sort commits by date (descending)
+* Start grouping from most recent commit
+* Include commits within 3-hour window from previous commit
+* Stop if: more than 8 commits collected OR time gap > 4 hours
+* Returns the latest meaningful session
+
+### Notes:
+
+* Session-based grouping preserves context better than arbitrary 24-hour windows
+* Activity summaries now reflect meaningful developer sessions
+* PR/commit correlation based on actual session timing improves relevance
+* No AI changes; logic remains deterministic and reusable
+
+### Risks:
+
+* Session heuristics (3h window, 4h gap, 8 commits) may need tuning based on real usage
+* Edge case: fast-paced development may group into fewer, larger sessions
+
+### Status:
+
+✅ Context-aware activity detection implemented
+
+### Files Modified:
+
+* `/services/activity.service.ts` — core refactoring with new session logic
+* `VOCA_PROGRESS.md` — documentation
+
+### Code Structure:
+
+* `detectLatestSession(commits)` — identifies latest coherent session
+* `extractSessionTimeRange(sessionCommits)` — calculates time boundaries
+* `isDateInRange(dateStr, range)` — helper for PR time filtering
+* `classifyText(texts)` — activity classification (unchanged)
+* `generateActivitySummary(repoFullName, accessToken)` — main orchestration using sessions
+
+### Future Improvements:
+
+* Make session parameters configurable (window size, max commits, gap threshold)
+* Add telemetry to track actual session patterns and tune heuristics
+* Consider multiple sessions for trend analysis
+* Implement activity timeline visualization
+
+

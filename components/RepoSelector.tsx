@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 type Repo = { name: string; full_name: string; private: boolean; updated_at: string }
 
@@ -10,6 +11,7 @@ export default function RepoSelector() {
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     setLoading(true)
@@ -53,7 +55,9 @@ export default function RepoSelector() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Save failed')
-      alert('Repo saved')
+      // navigate to commits page (server returns redirect hint)
+      const target = data.redirect || '/commits'
+      router.push(target)
     } catch (e: any) {
       setError(e.message)
     } finally {
