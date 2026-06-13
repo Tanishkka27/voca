@@ -150,3 +150,4 @@ All work tracked in Linear (Vocaa workspace):
 - **Voca - Product & Strategy** — positioning, copy, PH assets
 - **Voca - GTM & Launch** — PH listing, hunter outreach, launch day
 - **Voca - Beta & Feedback** — beta sessions, testimonials
+
