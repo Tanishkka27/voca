@@ -8,7 +8,7 @@ Voca watches your GitHub repos and turns your real engineering work (PRs, commit
 
 ## Full Product Requirements Document
  
-**[Voca PRD (Complete)](./voca_prd.md)** — comprehensive spec covering positioning, ICP, architecture, all 7 EPICs, Phase 2 scope, GTM plan, and open questions.
+**[Voca PRD (Complete)](https://docs.google.com/document/d/1MMsYrnWU383izqvbg9WFS-ZGO9m3LFYVYatbf3Vseqw/edit?tab=t.5byza0t4hfw0)** — comprehensive spec covering positioning, ICP, architecture, all 7 EPICs, Phase 2 scope, GTM plan, and open questions.
  
 ---
 
