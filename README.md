@@ -6,6 +6,12 @@ Voca watches your GitHub repos and turns your real engineering work (PRs, commit
 
 ---
 
+## Full Product Requirements Document
+ 
+**[Voca PRD (Complete)](./voca_prd.md)** — comprehensive spec covering positioning, ICP, architecture, all 7 EPICs, Phase 2 scope, GTM plan, and open questions.
+ 
+---
+
 ## What We're Building
 
 Founders who build in public struggle to post consistently. They're shipping every day but never talking about it. Voca closes that gap: connect your GitHub, pick a repo, and get 3 draft posts generated from your latest PR — ready to copy, edit, and publish.
