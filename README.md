@@ -1,159 +1,188 @@
 # Voca
 
-**GitHub activity → authentic founder content.**
+> Turn what you actually shipped this week into a LinkedIn post that sounds like you — not ChatGPT.
 
-Voca watches your GitHub repos and turns your real engineering work (PRs, commits) into LinkedIn posts that sound like you — not ChatGPT.
-
----
-
-## Full Product Requirements Document
- 
-**[Voca PRD (Complete)](https://docs.google.com/document/d/1MMsYrnWU383izqvbg9WFS-ZGO9m3LFYVYatbf3Vseqw/edit?tab=t.5byza0t4hfw0)** — comprehensive spec covering positioning, ICP, architecture, all 7 EPICs, Phase 2 scope, GTM plan, and open questions.
- 
----
-
-## What We're Building
-
-Founders who build in public struggle to post consistently. They're shipping every day but never talking about it. Voca closes that gap: connect your GitHub, pick a repo, and get 3 draft posts generated from your latest PR — ready to copy, edit, and publish.
-
-**MVP success criteria:**
-- 5 users complete the full flow (connect GitHub → generate post)
-- 2 users say "this actually sounds like me"
-- 1 user posts publicly
-
-**Target launch:** Product Hunt, May 11 2026
+Voca connects to your GitHub, reads your latest commits and PRs, and generates 3 authentic LinkedIn post drafts in 3 different styles. You pick one, tweak it if you want, and post it. Core loop under 60 seconds.
 
 ---
 
-## Architecture (7 EPICs)
+## Live Project Board
 
-```
-GitHub OAuth → Repo Selection → Data Extraction → Content Generation → Draft UI → Manual Trigger
-                                                                                        ↓
-                                                                               Automation (Phase 2)
-                                                                               Voice Personalization (optional)
-```
+**[Voca — Product Team B → GitHub Project #7](https://github.com/orgs/Arthakram/projects/7)**
 
-| EPIC | Description | Status |
-|------|-------------|--------|
-| 1 | GitHub Integration — OAuth, repo selection, token storage | ✅ Done |
-| 2 | Data Extraction — fetch PRs + commits, filter noise, structure signal | 🔲 Next |
-| 3 | Content Generation — prompt v1, 3 structurally different variations | 🔲 Next |
-| 5 | Manual Trigger — "Generate Post from Latest PR" button | 🔲 Next |
-| 4 | Draft UI — display, edit, copy, regenerate | 🔲 Next |
-| 6 | Automation — daily cron, quality gate, stored drafts | 🔲 Phase 2 |
-| 7 | Voice Personalization — writing style input, tone selector | 🔲 Optional |
-
-> Build order: 1 → 2 → 3 → 5 → 4 → validate with users → 6 → 7 if needed
+All work is tracked there. Check it before picking up any task.
 
 ---
 
-## What's Done
+## Current State
 
-### EPIC 1: GitHub Integration ✅
-- [x] GitHub OAuth setup (VOC-116)
-- [x] Store GitHub access token securely in DB (VOC-117)
-- [x] Fetch user repositories from GitHub API (VOC-118)
-- [x] Repo selection UI (VOC-119)
-- [x] Persist selected repo to DB (VOC-120)
+| EPIC | Description | Status | Owner |
+|------|-------------|--------|-------|
+| EPIC 1 | GitHub OAuth + Repo Selection | ✅ Done | Aradhya |
+| EPIC 2 | Data Extraction (session detection) | 🟡 Partially done | Tanishkka |
+| EPIC 3 | Content Generation via Claude | 🔴 Not started | Tanishkka |
+| EPIC 4 | Draft UI (display / edit / copy) | 🔴 Not started | Fenil |
+| EPIC 5 | Manual Trigger + Loading/Error | 🔴 Not started | Fenil |
+| EPIC 6 | QA + Demo Mode | 🔴 Not started | Both |
 
-**Current state:** User can sign in with GitHub, browse their repos, and save a selected repo. Auth token stored server-side only (never exposed to client). Prisma + PostgreSQL backing everything.
+**Current focus:** EPIC 2 (Issue #13 — confirm JSON schema) → EPIC 3 (Issues #14, #15) → EPIC 5 (Issues #16, #17, #18) → EPIC 4 (Issues #19-23) → QA.
 
----
-
-## What's Left (in build order)
-
-### EPIC 2: Data Extraction
-- [ ] Fetch PRs from last 7 days — title + description (VOC-121)
-- [ ] Fetch commits — last 24h and PR-linked (VOC-122)
-- [ ] Filter low-quality commits from data pipeline (VOC-123)
-- [ ] Structure extracted data into "what changed" / "why it changed" (VOC-124)
-
-### EPIC 3: Content Generation
-- [ ] Prompt v1 — constraints-first content generation (VOC-125)
-- [ ] Generate 3 structurally different post variations (VOC-126)
-
-### EPIC 5: Manual Trigger (first version)
-- [ ] "Generate Post from Latest PR" trigger button (VOC-131)
-- [ ] Loading state and generation progress indicator (VOC-132)
-- [ ] Error handling — no PR found in last 7 days (VOC-133)
-
-### EPIC 4: Draft UI
-- [ ] Draft display screen — show all 3 variations (VOC-127)
-- [ ] Manual text editing per draft (VOC-128)
-- [ ] Copy to clipboard button (VOC-129)
-- [ ] Regenerate button — re-run generation from same PR data (VOC-130)
-
-### EPIC 6: Automation (Phase 2, post-validation)
-- [ ] 24h cron job for automated generation (VOC-134)
-- [ ] Activity quality check — skip if nothing meaningful (VOC-135)
-- [ ] Store auto-generated drafts in DB (VOC-136)
-- [ ] Notify user when auto-generated drafts are ready (VOC-137)
-
-### EPIC 7: Voice Personalization (optional, build on evidence)
-- [ ] Writing style input — "How do you usually write?" (VOC-138)
-- [ ] Paste past posts as style reference (VOC-139)
-- [ ] Tone selector — casual / technical / storytelling (VOC-140)
+See `VOCA_PROGRESS.md` for the detailed engineering log.
 
 ---
 
-## Milestones
+## Team
 
-| Milestone | Target | Progress |
-|-----------|--------|----------|
-| M1 — Core Build (EPICs 1–5) | Apr 28 2026 | 18% |
-| M2 — Loop & Retention (EPIC 6) | May 5 2026 | 0% |
-| M3 — QA & Launch-Ready | May 10 2026 | 0% |
-| Product Hunt Launch | May 11 2026 | — |
+| Role | Person | GitHub |
+|------|--------|--------|
+| Product Lead | Rishav Dewan | @rish106-hub |
+| Engineering Reviewer | Aradhya Tiwari | @AradhyaTiwari10 |
+| Developer — Backend & AI | Tanishkka | @Tanishkka27 |
+| Developer — Frontend & UX | Fenil | @FSS3096 |
 
----
-
-## Tech Stack
-
-| Layer | Tech |
-|-------|------|
-| Framework | Next.js 14 (App Router + Pages Router hybrid) |
-| Language | TypeScript (strict) |
-| Auth | NextAuth v4 — GitHub OAuth, JWT strategy |
-| Database | PostgreSQL via Prisma ORM |
-| Styling | Tailwind CSS |
-| AI (planned) | Claude API — content generation |
+**Review policy:** every PR needs @AradhyaTiwari10 approval before merge. No exceptions.
 
 ---
 
-## Local Setup
+## Setup
+
+**Prerequisites:** Node 18+, npm/pnpm, a Supabase project, GitHub OAuth app, Anthropic API key.
+
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/Arthakram/voca.git
+cd voca
 npm install
+```
 
-# copy and fill: DATABASE_URL, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, NEXTAUTH_SECRET, NEXTAUTH_URL
-cp .env.example .env
+### 2. Environment variables
 
-npm run prisma:migrate
+Copy `.env.example` to `.env.local` and fill in all values:
+
+```env
+# GitHub OAuth (from github.com/settings/developers)
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+
+# NextAuth
+NEXTAUTH_SECRET=                    # generate with: openssl rand -base64 32
+NEXTAUTH_URL=http://localhost:3000
+
+# Supabase — use the IPv4 pooler (port 6543), not the direct connection
+DATABASE_URL=postgresql://postgres.[project]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
+
+# Anthropic
+ANTHROPIC_API_KEY=                  # from console.anthropic.com
+```
+
+> **Supabase note:** Use port **6543** with `?pgbouncer=true`. Port 5432 (direct) fails on restricted networks. See `VOCA_PROGRESS.md` for the full explanation.
+
+### 3. Database setup
+
+```bash
+npx prisma migrate dev
+```
+
+### 4. Run
+
+```bash
 npm run dev
 ```
+
+Open http://localhost:3000. Sign in with GitHub. Select a repo. Click Generate.
 
 ---
 
 ## Project Structure
 
 ```
-app/              # Next.js App Router — pages, layouts, NextAuth route
-components/       # React UI components
-lib/              # Server-side utils (auth config, Prisma singleton)
-pages/api/        # REST API handlers (repo list, repo selection)
-prisma/           # DB schema + migrations
-services/         # GitHub API calls + DB write abstractions
-types/            # TypeScript declarations
+voca/
+├── app/                    # Next.js App Router
+│   ├── page.tsx            # Landing page + demo mode
+│   ├── dashboard/          # Post-auth dashboard (repo selector + trigger button)
+│   └── drafts/             # Draft display page (3 variations)
+├── components/             # Shared React components
+│   ├── GenerateButton.tsx  # Trigger button — calls /api/generate
+│   ├── LoadingView.tsx     # Step-by-step loading animation
+│   ├── ErrorView.tsx       # Typed error display with retry
+│   └── DraftCard.tsx       # Inline-editable draft card (copy + LinkedIn link)
+├── pages/api/              # REST API handlers
+│   ├── auth/               # NextAuth handler
+│   ├── repos.ts            # GET list of user's repos
+│   └── generate.ts         # POST trigger generation — calls activity + content services
+├── services/
+│   ├── activity.service.ts # GitHub data extraction (session detection — DONE)
+│   └── content.service.ts  # Claude API + parallel generation (EPIC 3)
+├── lib/
+│   ├── auth.ts             # NextAuth config
+│   ├── prisma.ts           # Prisma singleton
+│   └── demo-data.ts        # Static data for landing page demo
+├── types/
+│   ├── activity.ts         # ActivitySummary interface
+│   └── generation.ts       # GenerationResult interface
+├── prisma/
+│   └── schema.prisma       # DB schema
+├── VOCA_PROGRESS.md        # Engineering log (more current than this README)
+└── .env.example            # Environment variable template
 ```
 
 ---
 
-## Linear
+## How to contribute (for Tanishkka and Fenil)
 
-All work tracked in Linear (Vocaa workspace):
-- **Voca - Engineering** — all technical EPICs and tasks
-- **Voca - Product & Strategy** — positioning, copy, PH assets
-- **Voca - GTM & Launch** — PH listing, hunter outreach, launch day
-- **Voca - Beta & Feedback** — beta sessions, testimonials
+1. Look at the project board: https://github.com/orgs/Arthakram/projects/7
+2. Pick the highest-priority open issue assigned to you
+3. Move it to **In Progress** on the board
+4. Create a branch: `feat/voc-{issue-number}-short-description` (e.g. `feat/voc-13-json-schema-audit`)
+5. Build. Commit with the issue number in the message: `feat(voc-13): add ActivitySummary type`
+6. Push, open a PR, add `Closes #13` in the PR body
+7. Request review from @AradhyaTiwari10
+8. After approval and merge: mark the issue Done on the board
+9. Update `VOCA_PROGRESS.md` with what you shipped and any important findings
 
+**Branch naming matters** — it connects your commits to the project board automatically.
+
+---
+
+## Definition of Done (applies to every issue)
+
+Before marking any issue Done:
+
+- [ ] All acceptance criteria in the issue body are checked off
+- [ ] PR reviewed and approved by @AradhyaTiwari10
+- [ ] No raw errors reachable by any user path
+- [ ] Tested on desktop and mobile
+- [ ] TypeScript strict mode passes (`npm run type-check` or `tsc --noEmit`)
+- [ ] `VOCA_PROGRESS.md` updated
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Notes |
+|-------|-----------|-------|
+| Framework | Next.js 14 | App Router + Pages Router hybrid |
+| Language | TypeScript (strict) | No `any` |
+| Auth | NextAuth v4 | GitHub OAuth, JWT strategy |
+| Database | PostgreSQL via Prisma | Hosted on Supabase |
+| Styling | Tailwind CSS | Core utility classes only |
+| AI | Claude API (claude-opus-4-8) | For content generation |
+| Clipboard | navigator.clipboard API | With execCommand fallback |
+
+---
+
+## Resources
+
+| Resource | Link |
+|----------|------|
+| Project Board | https://github.com/orgs/Arthakram/projects/7 |
+| Full PRD | https://docs.google.com/document/d/1MMsYrnWU383izqvbg9WFS-ZGO9m3LFYVYatbf3Vseqw/edit |
+| Engineering Log | [VOCA_PROGRESS.md](./VOCA_PROGRESS.md) |
+| Supabase Dashboard | Ask Rishav for access |
+| Anthropic Console | https://console.anthropic.com |
+| Linear (archived) | https://linear.app/vocaa |
+
+---
+
+*Product: @rish106-hub · Engineering: @AradhyaTiwari10 · Build: @Tanishkka27, @FSS3096*
