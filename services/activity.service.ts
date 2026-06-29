@@ -1,20 +1,12 @@
 import { fetchPullRequests, PRItem, fetchCommits, CommitItem } from './github.service'
-
-type ActivityType = 'bugfix' | 'feature' | 'mixed'
-
-type ActivitySummary = {
-  type: ActivityType | null
-  highlights: string[]
-  counts: {
-    prs: number
-    commits: number
-  }
-}
+import type { ActivitySummary } from '../types/activity'
 
 type SessionTimeRange = {
   startTime: Date
   endTime: Date
 }
+
+const RECENT_ACTIVITY_DAYS = 7
 
 /**
  * Detects the latest activity session from commits.
@@ -114,34 +106,25 @@ function isDateInRange(dateStr: string | null, range: SessionTimeRange | null): 
   return d >= range.startTime.getTime() && d <= range.endTime.getTime()
 }
 
-function classifyText(texts: string[]): 'bug' | 'feature' | 'refactor' | 'mixed' | null {
-  const kBug = ['fix', 'bug', 'error', 'issue']
-  const kFeature = ['add', 'implement', 'feature', 'create']
-  const kRefactor = ['refactor', 'cleanup', 'optimize']
-
-  let counts = { bug: 0, feature: 0, refactor: 0 }
-  for (const t of texts) {
-    const low = t.toLowerCase()
-    for (const k of kBug) if (low.includes(k)) counts.bug++
-    for (const k of kFeature) if (low.includes(k)) counts.feature++
-    for (const k of kRefactor) if (low.includes(k)) counts.refactor++
-  }
-  const types = [] as string[]
-  if (counts.bug > 0) types.push('bug')
-  if (counts.feature > 0) types.push('feature')
-  if (counts.refactor > 0) types.push('refactor')
-
-  if (types.length === 0) return null
-  if (types.length === 1) return types[0] as 'bug' | 'feature' | 'refactor'
-  return 'mixed'
+function getPRActivityTime(pr: PRItem): number {
+  return new Date(pr.merged_at ?? pr.created_at).getTime()
 }
 
-export async function generateActivitySummary(repoFullName: string, accessToken: string) {
+function filterRecentPRs(prs: PRItem[]): PRItem[] {
+  const cutoff = Date.now() - RECENT_ACTIVITY_DAYS * 24 * 60 * 60 * 1000
+  return prs.filter((pr) => getPRActivityTime(pr) >= cutoff)
+}
+
+export async function generateActivitySummary(
+  repoFullName: string,
+  accessToken: string
+): Promise<ActivitySummary | null> {
   if (!repoFullName) throw new Error('Invalid repoFullName')
 
   // Fetch data
   const prs = (await fetchPullRequests(repoFullName, accessToken)) as PRItem[]
   const commits = (await fetchCommits(repoFullName, accessToken)) as CommitItem[]
+  const recentPRs = filterRecentPRs(prs)
 
   // Detect latest session from commits
   const sessionCommits = detectLatestSession(commits)
@@ -149,20 +132,20 @@ export async function generateActivitySummary(repoFullName: string, accessToken:
 
   // If no commits in session, fallback to PRs
   if (sessionCommits.length === 0) {
-    if (prs.length === 0) {
-      return { summary: null, message: 'No recent activity detected' }
+    if (recentPRs.length === 0) {
+      return null
     }
 
-    // Fallback: use top PRs as highlights
-    const texts: string[] = prs.slice(0, 5).map((p) => p.title)
-    const type: ActivityType | null = 'mixed'
+    const primaryPR = recentPRs[0]
+    const prDescription = primaryPR.body ?? ''
 
     return {
-      summary: {
-        type,
-        highlights: texts,
-        counts: { prs: prs.length, commits: 0 },
-      },
+      what_changed: primaryPR.title,
+      why_it_changed: prDescription,
+      pr_title: primaryPR.title,
+      pr_description: prDescription,
+      commit_count: 0,
+      notable_commits: [],
     }
   }
 
@@ -200,29 +183,38 @@ export async function generateActivitySummary(repoFullName: string, accessToken:
   )
 
   if (uniq.length === 0) {
-    return { summary: null, message: 'No meaningful activity in latest session' }
+    return null
   }
-
-  // Classify activity type
-  const cls = classifyText(uniq as string[])
-  let type: ActivityType | null = null
-  if (!cls) type = null
-  else if (cls === 'bug') type = 'bugfix'
-  else if (cls === 'feature') type = 'feature'
-  else type = 'mixed'
 
   // Highlights: top 3-5, prefer longer/more descriptive messages
   const scored = uniq.map((t) => ({ t, score: t.length }))
   scored.sort((a, b) => b.score - a.score)
   const highlights = scored.slice(0, Math.min(5, scored.length)).map((s) => s.t)
 
+  const notableCommits = Array.from(
+    new Set(
+      sessionCommits
+        .map((c) => c.message)
+        .filter((message) => {
+          if (!message || message.trim().length < 5) return false
+          const lower = message.trim().toLowerCase()
+          return !trivialKeywords.has(lower)
+        })
+    )
+  ).slice(0, 5)
+
+  const primaryPR = sessionPRs[0] ?? recentPRs[0] ?? null
+  const prTitle = primaryPR?.title ?? ''
+  const prDescription = primaryPR?.body ?? ''
+
   const summary: ActivitySummary = {
-    type,
-    highlights,
-    counts: { prs: sessionPRs.length, commits: sessionCommits.length },
+    what_changed: prTitle || highlights[0] || '',
+    why_it_changed: prDescription,
+    pr_title: prTitle,
+    pr_description: prDescription,
+    commit_count: sessionCommits.length,
+    notable_commits: notableCommits,
   }
 
-  return { summary }
+  return summary
 }
-
-export type { ActivitySummary }

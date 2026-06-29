@@ -190,4 +190,31 @@ Session Detection:
 * Consider multiple sessions for trend analysis
 * Implement activity timeline visualization
 
+## VOC-124 - Activity Summary Schema Gate
 
+### Audit Result:
+
+* Existing `generateActivitySummary()` output diverged from the Claude prompt schema.
+* Old output used `{ summary: { type, highlights, counts } }` and returned wrapper objects for empty states.
+* Required output is a direct `ActivitySummary | null` shape with six fields: `what_changed`, `why_it_changed`, `pr_title`, `pr_description`, `commit_count`, and `notable_commits`.
+
+### Completed:
+
+* Added exported `ActivitySummary` interface in `types/activity.ts`.
+* Updated `generateActivitySummary()` to return `ActivitySummary | null`.
+* Preserved existing session detection, session time range extraction, PR correlation, and noise filtering logic.
+* Mapped PR and commit activity into the required downstream schema.
+* Ensured `pr_description` and `why_it_changed` are strings, using `''` when a PR body is empty.
+* Limited `notable_commits` to meaningful commit messages, max 5.
+* Updated `/api/activity` to handle the new nullable summary shape.
+* Added a recent PR guard for PR-only fallback so stale PRs do not count as current activity.
+
+### Verification:
+
+* Mocked end-to-end harness covered merged PR + commits, empty PR body, PR-only fallback, stale/no recent PRs, all commits filtered, and max notable commit limits.
+* Full `npx tsc --noEmit` no longer reports errors in `pages/api/activity/index.ts`; remaining TypeScript errors are pre-existing session typing issues in repos/commits routes.
+* Real GitHub audit still requires a valid `GITHUB_TOKEN` in the local environment.
+
+### Status:
+
+✅ VOC-124 schema gate implemented and ready for PR review by @AradhyaTiwari10
