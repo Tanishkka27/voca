@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import type { ActivitySummary } from '@/types/activity';
+import type { GenerationResult, DraftSuccess, DraftError } from '@/types/generation';
 import { findBannedPhrases, BANNED_PHRASES, checkStructure as checkStructureResult } from './prompts';
 
 export { findBannedPhrases, BANNED_PHRASES };
@@ -251,4 +252,73 @@ export async function generateDraft(activity: ActivitySummary, style: DraftStyle
   }
 
   return draft;
+}
+
+// ---------------------------------------------------------------------------
+// VOC-126 — Multi-style parallel generation
+// ---------------------------------------------------------------------------
+
+const DRAFT_TIMEOUT_MS = 20_000; // 20 seconds per individual draft
+
+/**
+ * Races a draft generation promise against a timeout.
+ * Rejects with a timeout error if the generation exceeds DRAFT_TIMEOUT_MS.
+ */
+function withTimeout(promise: Promise<string>, style: DraftStyle): Promise<string> {
+  return Promise.race([
+    promise,
+    new Promise<string>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Draft generation timed out after ${DRAFT_TIMEOUT_MS / 1000}s (style=${style})`)),
+        DRAFT_TIMEOUT_MS,
+      ),
+    ),
+  ]);
+}
+
+/**
+ * Generates all 3 style variations in parallel using Promise.allSettled.
+ *
+ * Key guarantees:
+ * - All 3 styles are requested simultaneously (never sequentially).
+ * - If 1 or 2 styles fail (or time out), the successful drafts are still returned.
+ * - If all 3 fail, returns an empty drafts array with 3 errors — never throws.
+ * - Total wall time is bounded by the slowest single call (target < 25 s).
+ * - Each individual call is capped at DRAFT_TIMEOUT_MS (20 s).
+ */
+export async function generateAllDrafts(
+  activity: ActivitySummary,
+): Promise<GenerationResult> {
+  const styles: DraftStyle[] = ['raw', 'polished', 'short'];
+  const wallStart = Date.now();
+
+  const results = await Promise.allSettled(
+    styles.map(style => withTimeout(generateDraft(activity, style), style)),
+  );
+
+  const wallMs = Date.now() - wallStart;
+  console.info(`[VOC-126] generateAllDrafts: all 3 styles settled in ${wallMs}ms`);
+
+  const drafts: DraftSuccess[] = [];
+  const errors: DraftError[] = [];
+
+  results.forEach((result, i) => {
+    const style = styles[i];
+    if (result.status === 'fulfilled') {
+      drafts.push({ style, content: result.value, success: true });
+    } else {
+      const message =
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason ?? 'Unknown error');
+      errors.push({ style, error: message, success: false });
+    }
+  });
+
+  return {
+    drafts,
+    errors,
+    generatedAt: new Date().toISOString(),
+    activitySummary: activity,
+  };
 }

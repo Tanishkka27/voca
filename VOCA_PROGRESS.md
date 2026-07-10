@@ -518,3 +518,92 @@ All 5 final drafts passed validation successfully. Below is the detailed breakdo
 ### Status:
 ✅ E2E generation verified on 5 real PRs with Groq fallback. Ready for merge.
 
+---
+
+## VOC-126 — Generation Layer (Parallel 3-Style Draft Generation)
+
+### Owner: @Tanishkka27 — Generation Logic
+
+**Scope**: Claude/Groq orchestration layer. Can Voca reliably create 3 different posts in parallel?
+
+---
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `types/generation.ts` | [NEW] Defines `DraftSuccess`, `DraftError`, `GenerationResult` |
+| `services/content.service.ts` | [MODIFIED] Added `generateAllDrafts()`, `withTimeout()` |
+
+---
+
+### Implementation Summary
+
+- `generateAllDrafts(activity)` fires all 3 styles (`raw`, `polished`, `short`) **simultaneously** using `Promise.allSettled` — never sequentially.
+- Each individual call is wrapped in `withTimeout()` — a `Promise.race` against a 20s timer. If a single style exceeds 20s it resolves as a `DraftError`, not a crash.
+- If 1 or 2 styles fail, the remaining successful drafts are still returned. If all 3 fail, returns an empty `drafts[]` with 3 errors — never throws.
+- Wall time is measured and logged via `console.info` on every call.
+- Zero `any` types. `tsc --noEmit` passes clean.
+
+---
+
+### Test Results — `scripts/test-voc126.ts` (run 2026-07-10)
+
+**Provider**: Groq (`llama-3.3-70b-versatile`, default)
+**Activity used**: `fix: resolve race condition in session token refresh`
+
+#### TEST 1 — Normal run: all 3 styles in parallel
+
+```
+Wall time: 3943ms
+drafts  : 3
+errors  : 0
+
+✅ [RAW]      (206 words) — opens with "we were getting killed by random logouts, no idea what was causing it..."
+✅ [POLISHED] (271 words) — opens with "random logouts were killing me. we'd get these weird reports..."
+✅ [SHORT]    (93 words)  — opens with "Random logouts were killing me. I mean users were just getting kicked out..."
+
+Result: ✅ PASS
+Styles returned: raw, polished, short
+Within 25s budget: ✅ YES (3943ms)
+```
+
+#### TEST 2 — Partial failure shape: one style fails, others still returned
+
+```
+drafts[0].success === true   : ✅
+errors[0].success === false  : ✅
+errors[1].success === false  : ✅
+generatedAt is ISO string    : ✅
+activitySummary echoed back  : ✅
+
+Result: ✅ PASS
+```
+
+#### TEST 3 — Structure guarantees: all 3 styles present, no duplicates
+
+```
+All 3 styles accounted for : ✅
+No duplicate styles        : ✅
+Styles found: raw, polished, short
+Wall time (second run): 3191ms
+
+Result: ✅ PASS
+```
+
+---
+
+### Performance
+
+| Metric | Target | Actual |
+|---|---|---|
+| Total wall time (3 styles parallel) | < 25s | **3943ms** ✅ |
+| Per-draft timeout threshold | 20s | Configured via `DRAFT_TIMEOUT_MS = 20_000` |
+| Parallelism | All 3 simultaneous | Confirmed via `Promise.allSettled` |
+
+---
+
+### Status:
+
+✅ Generation layer complete. All 3 tests passed. `tsc --noEmit` clean.
+Awaiting partner's `POST /api/generate` for full end-to-end curl verification.
