@@ -6,7 +6,7 @@ import { saveSelectedRepo } from '@/services/github.service'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-  const session = await getServerSession(req, res, authOptions as any)
+  const session = (await getServerSession(req, res, authOptions as any)) as any
   if (!session || !session.user) return res.status(401).json({ error: 'Unauthorized' })
 
   const { repoName, repoFullName } = req.body
