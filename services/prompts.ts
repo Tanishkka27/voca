@@ -83,3 +83,38 @@ Rewrite it completely without those words or any close synonyms of them. Keep th
 
 ${buildUserPrompt(activity, style)}`
 }
+
+export interface StructureCheckResult {
+  pass: boolean
+  failures: string[]
+}
+
+const OUTCOME_FIRST_SIGNALS = [
+  'excited',
+  'proud',
+  'thrilled',
+  'happy to share',
+  'just shipped',
+  'finally launched',
+  'i shipped',
+  'we shipped',
+  'announcing',
+  'introducing',
+]
+
+export function checkStructure(draft: string): StructureCheckResult {
+  const failures: string[] = []
+  const firstSentence = draft.trim().split(/(?<=[.!?])\s/)[0]?.toLowerCase() ?? ''
+
+  const hasOutcomeOpening = OUTCOME_FIRST_SIGNALS.some((signal) =>
+    firstSentence.includes(signal)
+  )
+  if (hasOutcomeOpening) {
+    failures.push('Opens with outcome language instead of friction or struggle')
+  }
+
+  return {
+    pass: failures.length === 0,
+    failures,
+  }
+}
