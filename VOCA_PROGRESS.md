@@ -606,4 +606,51 @@ Result: ✅ PASS
 ### Status:
 
 ✅ Generation layer complete. All 3 tests passed. `tsc --noEmit` clean.
-Awaiting partner's `POST /api/generate` for full end-to-end curl verification.
+
+---
+
+## VOC-126 — API Integration (Partner's side — merged into feat/voc-126)
+
+### What was added
+
+Partner (`@p4rths1105`) pushed branch `parth-voc-126-api-integration` with:
+- `types/generation.ts` — `GenerationResult`, `DraftSuccess`, `DraftError` interfaces
+- `pages/api/generate.ts` — POST route skeleton
+- `services/prompts.ts` — `checkStructure` added (already present in our branch)
+
+### Integration decision
+
+Rather than merging the entire partner branch (which would conflict on `prompts.ts`
+and `types/generation.ts` already committed on `feat/voc-126`), the API route was
+authored directly on `feat/voc-126` incorporating partner's logic with the following
+improvements:
+
+- **Zero `any` types** — `authOptions as any`, `session as any`, `e: any` all removed
+- **Typed session resolution** — `session.user` destructured with explicit `{ id, email }` type assertion
+- **Private/404 repo** — GitHub 404 errors surfaced as a clear 404 + user-friendly message (not a 500/502)
+- **Typed response union** — handler typed as `NextApiResponse<GenerationResult | ErrorResponse | NoActivityResponse>`
+- **`tsc --noEmit` clean** — verified after writing the file
+
+### Endpoint behaviour
+
+| Scenario | HTTP status | Body |
+|---|---|---|
+| Not authenticated | 401 | `{ error: "Unauthorized" }` |
+| No accessToken in DB | 403 | `{ error: "Missing access token…" }` |
+| No repo selected | 404 | `{ error: "No repository selected…" }` |
+| Private/not-found repo | 404 | `{ error: "Repository … was not found or you don't have access…" }` |
+| No recent activity | 200 | `{ noActivity: true, message: "No recent activity found" }` |
+| All 3 drafts generated | 200 | Full `GenerationResult` |
+| Non-method | 405 | `{ error: "Method not allowed" }` |
+
+### TypeScript check
+
+```
+npx tsc --noEmit
+→ (no output — clean)
+```
+
+### Status:
+
+✅ VOC-126 fully complete — generation layer + API route both on `feat/voc-126`.
+`tsc --noEmit` clean. Ready for end-to-end curl verification once dev server is running.
