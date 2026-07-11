@@ -232,7 +232,7 @@ export async function generateDraft(activity: ActivitySummary, style: DraftStyle
   const errors = validateDraft(draft, activity, style);
 
   if (errors.length > 0) {
-    (global as any).vocaRetried = true;
+    (global as Record<string, unknown>).vocaRetried = true;
     const bannedPhrases = findBannedPhrases(draft);
     const structuralResult = checkStructureResult(draft);
     const structuralFailures = structuralResult.failures;

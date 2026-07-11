@@ -7,7 +7,7 @@ import { generateAllDrafts } from '@/services/content.service'
 import type { GenerationResult } from '@/types/generation'
 
 type ErrorResponse = { error: string }
-type NoActivityResponse = { noActivity: true; message: string }
+type NoActivityResponse = { drafts: []; errors: []; noActivity: true }
 
 export default async function handler(
   req: NextApiRequest,
@@ -39,32 +39,41 @@ export default async function handler(
     return res.status(403).json({ error: 'Missing access token — please sign out and sign in again' })
   }
 
-  // Resolve the stored repo for this user
-  const repo = await prisma.repo.findFirst({ where: { userId: user.id } })
-  if (!repo) {
-    return res.status(404).json({ error: 'No repository selected. Add a repo first.' })
+  // repoFullName — accept from request body first, fall back to stored Repo record
+  const bodyRepo: unknown = req.body?.repoFullName
+  let repoFullName: string
+
+  if (typeof bodyRepo === 'string' && bodyRepo.trim().length > 0) {
+    repoFullName = bodyRepo.trim()
+  } else {
+    const repo = await prisma.repo.findFirst({ where: { userId: user.id } })
+    if (!repo) {
+      return res.status(400).json({ error: 'repoFullName required — pass it in the request body or select a repo first' })
+    }
+    repoFullName = repo.repoFullName
   }
 
   try {
     // Build activity summary from GitHub
-    const activity = await generateActivitySummary(repo.repoFullName, user.accessToken)
+    const activity = await generateActivitySummary(repoFullName, user.accessToken)
 
-    // No recent commits / PRs found — not an error
+    // No recent commits / PRs found — not an error (match spec shape exactly)
     if (!activity) {
-      return res.status(200).json({ noActivity: true, message: 'No recent activity found' })
+      return res.status(200).json({ drafts: [], errors: [], noActivity: true })
     }
 
-    // Generate all 3 style drafts in parallel (Promise.allSettled inside)
+    // Generate all 3 style drafts in parallel (Promise.allSettled inside generateAllDrafts)
     const result: GenerationResult = await generateAllDrafts(activity)
 
     return res.status(200).json(result)
   } catch (err: unknown) {
+    // Private/not-found repo surfaces as a clear user-facing 404
     const isGitHub404 =
       err instanceof Error && err.message.toLowerCase().includes('404')
 
     if (isGitHub404) {
       return res.status(404).json({
-        error: `Repository "${repo.repoFullName}" was not found or you don't have access. Check that it's a public repo or that your GitHub token has the right scope.`,
+        error: `Repository "${repoFullName}" was not found or you don't have access. Check that it's a public repo or that your GitHub token has the right scope.`,
       })
     }
 
