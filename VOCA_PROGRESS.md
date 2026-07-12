@@ -654,3 +654,101 @@ npx tsc --noEmit
 
 ✅ VOC-126 fully complete — generation layer + API route both on `feat/voc-126`.
 `tsc --noEmit` clean. Ready for end-to-end curl verification once dev server is running.
+
+---
+
+## VOC-126 — End-to-End Pipeline Test
+
+**Date:** 2026-07-12T02:37:38Z  
+**Script:** `scripts/e2e-voc126.ts`  
+**Repo:** `Tanishkka27/voca`  
+**Provider:** groq (default)
+
+### Method
+
+OAuth login unavailable locally (OAuth app registered under a third-party GitHub account).  
+Script directly exercises the identical service chain that `POST /api/generate` calls internally:
+
+```
+GitHub API → ActivitySummary → generateAllDrafts(activity)
+```
+
+Auth layer (401 path) separately verified by partner (@p4rths1105).
+
+### Raw Output
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║         VOC-126 — End-to-End Pipeline Test                  ║
+╚══════════════════════════════════════════════════════════════╝
+
+Repo     : Tanishkka27/voca
+Provider : groq (default)
+Time     : 2026-07-12T02:37:38.318Z
+
+STEP 1 — Fetch PRs + commits from GitHub API
+GitHub fetch done in 858ms
+  PRs found    : 0
+  Commits found: 18
+
+STEP 2 — Build ActivitySummary
+Activity summary:
+  pr_title      : (none — commit-based session)
+  what_changed  : docs: comprehensive README for Product Team B — setup, structure, build order, team guide
+  commit_count  : 3
+  notable_commits: docs: comprehensive README for Product Team B | Update README.md
+
+STEP 3 — generateAllDrafts (raw + polished + short in parallel)
+[VOC-126] generateAllDrafts: all 3 styles settled in 1434ms
+
+All styles settled in 1435ms
+drafts : 3
+errors : 0
+generatedAt: 2026-07-12T02:37:40.613Z
+
+✅ [RAW]  (189 words)
+so I just spent way too long trying to get our team docs in order, specifically for
+Product Team B, and I'm not even sure if it's done right yet. docs were a mess, no idea
+where to start. I mean we had nothing, so I figured I'd just start with a comprehensive
+README, get everything in one place, you know, setup, structure, build order, the whole
+team guide...
+
+✅ [POLISHED]  (167 words)
+I've been hitting my head against the wall trying to get our Product Team B setup docs
+in order. it's a mess. we've had a few people switch roles and it's been tough to keep
+everything straight. I spent way too much time digging through old commits...
+
+✅ [SHORT]  (63 words)
+trying to get Product Team B up to speed was a nightmare. not sure what was more painful,
+the outdated setup or the missing build order docs. finally pushed that PR with a
+comprehensive README, pretty sure it's what we needed...
+
+STEP 4 — Acceptance Criteria
+  ✅  All 3 styles accounted for
+  ✅  No duplicate styles
+  ✅  generatedAt is ISO string
+  ✅  activitySummary echoed back
+  ✅  Within 25s budget
+  ✅  At least 1 draft succeeded
+  ✅  drafts have success: true
+  ✅  errors have success: false
+
+SUMMARY
+Styles succeeded : raw, polished, short
+Styles failed    : none
+Wall time        : 1435ms  (budget <25000ms) ✅
+Overall result   : ✅ PASS
+```
+
+### Performance
+
+| Metric | Target | Actual |
+|---|---|---|
+| Total wall time (3 styles parallel) | < 25s | **1435ms** ✅ |
+| Per-draft timeout threshold | 20s | `DRAFT_TIMEOUT_MS = 20_000` configured |
+| Parallelism | All 3 simultaneous | Confirmed via `Promise.allSettled` |
+
+### Status:
+
+✅ **VOC-126 DONE** — All acceptance criteria met. e2e pipeline verified. `tsc --noEmit` clean.
+
