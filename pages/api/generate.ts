@@ -18,15 +18,11 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  // Auth check — session exists but accessToken is NOT in the JWT payload exposed
-  // to the session object (deliberately excluded in auth.ts callbacks.session).
-  // We resolve it from the DB using the session user identifiers instead.
   const session = await getServerSession(req, res, authOptions)
   if (!session?.user) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  // Resolve the full User record (which holds the GitHub access token)
   const { id, email } = session.user as { id?: string; email?: string | null }
 
   const user = id
@@ -39,7 +35,6 @@ export default async function handler(
     return res.status(403).json({ error: 'Missing access token — please sign out and sign in again' })
   }
 
-  // repoFullName — accept from request body first, fall back to stored Repo record
   const bodyRepo: unknown = req.body?.repoFullName
   let repoFullName: string
 
@@ -54,20 +49,16 @@ export default async function handler(
   }
 
   try {
-    // Build activity summary from GitHub
     const activity = await generateActivitySummary(repoFullName, user.accessToken)
 
-    // No recent commits / PRs found — not an error (match spec shape exactly)
     if (!activity) {
       return res.status(200).json({ drafts: [], errors: [], noActivity: true })
     }
 
-    // Generate all 3 style drafts in parallel (Promise.allSettled inside generateAllDrafts)
     const result: GenerationResult = await generateAllDrafts(activity)
 
     return res.status(200).json(result)
   } catch (err: unknown) {
-    // Private/not-found repo surfaces as a clear user-facing 404
     const isGitHub404 =
       err instanceof Error && err.message.toLowerCase().includes('404')
 
