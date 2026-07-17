@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import type { ActivitySummary } from '@/types/activity';
 import type { GenerationResult, DraftSuccess, DraftError } from '@/types/generation';
 import { findBannedPhrases, BANNED_PHRASES, checkStructure as checkStructureResult } from './prompts';
+import { AppError, classifyProviderError, logError } from '@/lib/errors';
 
 export { findBannedPhrases, BANNED_PHRASES };
 
@@ -50,16 +51,26 @@ function getProvider(): Provider {
   return raw === 'claude' ? 'claude' : 'groq';
 }
 
+function providerLabel(provider: Provider): 'CLAUDE' | 'GROQ' {
+  return provider === 'claude' ? 'CLAUDE' : 'GROQ';
+}
+
 function createClient(provider: Provider): Anthropic | OpenAI {
   if (provider === 'claude') {
     if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY is required to generate content drafts with the Claude provider');
+      throw new AppError(
+        'Your Anthropic API key is invalid or missing. Check your API key configuration.',
+        'CLAUDE_INVALID_KEY',
+      );
     }
     return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   }
 
   if (!process.env.GROQ_API_KEY) {
-    throw new Error('GROQ_API_KEY is required to generate content drafts with the Groq provider');
+    throw new AppError(
+      'Your Groq API key is invalid or missing. Check your API key configuration.',
+      'GROQ_INVALID_KEY',
+    );
   }
   return new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: GROQ_BASE_URL });
 }
@@ -119,27 +130,41 @@ function buildRetryPrompt(
 }
 
 async function createDraft(client: Anthropic | OpenAI, provider: Provider, userPrompt: string): Promise<string> {
-  if (provider === 'claude') {
-    const response = await (client as Anthropic).messages.create({
-      model: CLAUDE_MODEL,
+  try {
+    if (provider === 'claude') {
+      const response = await (client as Anthropic).messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: MAX_TOKENS,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+      const textBlock = response.content.find((block) => block.type === 'text');
+      return textBlock?.type === 'text' ? textBlock.text.trim() : '';
+    }
+
+    const response = await (client as OpenAI).chat.completions.create({
+      model: GROQ_MODEL,
       max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
     });
-    const textBlock = response.content.find((block) => block.type === 'text');
-    return textBlock?.type === 'text' ? textBlock.text.trim() : '';
+
+    return response.choices[0]?.message?.content?.trim() ?? '';
+  } catch (err) {
+    const label = providerLabel(provider);
+    const classified = classifyProviderError(err, label);
+    logError('content.service', 'Provider API call failed', {
+      provider,
+      code: classified?.code ?? 'DRAFT_GENERATION_FAILED',
+      message: err instanceof Error ? err.message : String(err),
+    });
+    if (classified) {
+      throw new AppError(classified.message, classified.code);
+    }
+    throw err;
   }
-
-  const response = await (client as OpenAI).chat.completions.create({
-    model: GROQ_MODEL,
-    max_tokens: MAX_TOKENS,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userPrompt },
-    ],
-  });
-
-  return response.choices[0]?.message?.content?.trim() ?? '';
 }
 
 export function getTechnicalKeywords(activity: ActivitySummary): string[] {
@@ -245,8 +270,14 @@ export async function generateDraft(activity: ActivitySummary, style: DraftStyle
     // posting a drifting, generic-AI draft to LinkedIn.
     const retryErrors = validateDraft(draft, activity, style);
     if (retryErrors.length > 0) {
-      throw new Error(
+      logError('content.service', 'Draft failed validation after retry', {
+        provider,
+        style,
+        issues: retryErrors,
+      });
+      throw new AppError(
         `Draft generation failed validation after retry (provider=${provider}, style=${style}).\nRemaining issues:\n- ${retryErrors.join('\n- ')}`,
+        'DRAFT_VALIDATION_FAILED',
       );
     }
   }
@@ -269,7 +300,13 @@ function withTimeout(promise: Promise<string>, style: DraftStyle): Promise<strin
     promise,
     new Promise<string>((_, reject) =>
       setTimeout(
-        () => reject(new Error(`Draft generation timed out after ${DRAFT_TIMEOUT_MS / 1000}s (style=${style})`)),
+        () =>
+          reject(
+            new AppError(
+              `Draft generation timed out after ${DRAFT_TIMEOUT_MS / 1000}s (style=${style})`,
+              'DRAFT_TIMEOUT',
+            ),
+          ),
         DRAFT_TIMEOUT_MS,
       ),
     ),
@@ -311,7 +348,9 @@ export async function generateAllDrafts(
         result.reason instanceof Error
           ? result.reason.message
           : String(result.reason ?? 'Unknown error');
-      errors.push({ style, error: message, success: false });
+      const code = result.reason instanceof AppError ? result.reason.code : 'DRAFT_GENERATION_FAILED';
+      logError('content.service', 'Draft generation failed for style', { style, code, message });
+      errors.push({ style, error: message, code, success: false });
     }
   });
 
