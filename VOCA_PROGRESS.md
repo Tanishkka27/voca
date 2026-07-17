@@ -654,3 +654,52 @@ npx tsc --noEmit
 
 ✅ VOC-126 fully complete — generation layer + API route both on `feat/voc-126`.
 `tsc --noEmit` clean. Ready for end-to-end curl verification once dev server is running.
+
+---
+## VOC-17 — Silent Failure Audit
+
+### Audit Scope
+Systematic sweep of all backend files for silent failures — code paths where exceptions
+are swallowed, errors are unlogged, or users receive no feedback on failure.
+
+### Silent Failure Audit Table
+
+| File | Failure Type | Found | Fixed |
+|------|-------------|-------|-------|
+| `pages/api/generate.ts` | Prisma `findUnique` (user lookup) not wrapped in try/catch — DB failure throws raw error | ✅ | ❌ Pending |
+| `pages/api/generate.ts` | Prisma `findFirst` (repo lookup) not wrapped in try/catch | ✅ | ❌ Pending |
+| `pages/api/generate.ts` | GitHub 403 (scope) and 401 (token expired) collapsed into generic 502 | ✅ | ❌ Pending |
+| `pages/api/generate.ts` | No `console.error` on any error path — failures invisible in server logs | ✅ | ❌ Pending |
+| `pages/api/repos/index.ts` | GitHub 403 scope error collapsed into generic `e.message` — no specific code | ✅ | ❌ Pending |
+| `pages/api/repos/index.ts` | Prisma user lookup — no try/catch around DB calls | ✅ | ❌ Pending |
+| `lib/prisma.ts` | `new PrismaClient()` — no error handling if DB connection fails at startup | ✅ | ❌ Pending |
+| `services/activity.service.ts` | Empty commits array — handled correctly, returns `[]` | ✅ | ✅ Already handled |
+
+### Error Code Taxonomy
+
+| Code | Trigger |
+|------|---------|
+| `GITHUB_404` | Repo not found or no access |
+| `GITHUB_403` | GitHub token missing required scope |
+| `GITHUB_401` | GitHub token expired or revoked |
+| `GROQ_INVALID_KEY` | Bad or missing Groq API key |
+| `GROQ_RATE_LIMIT` | Groq rate limit hit |
+| `CLAUDE_INVALID_KEY` | Bad or missing Anthropic API key |
+| `CLAUDE_RATE_LIMIT` | Anthropic rate limit hit |
+| `EMPTY_ACTIVITY` | No recent commits or PRs found |
+| `PRISMA_CONNECTION` | Database connection failed |
+| `PRISMA_NOT_FOUND` | User or repo record missing in DB |
+
+### Key Findings
+
+1. **Prisma calls outside try/catch** — user and repo DB lookups in `generate.ts` and `repos/index.ts` are not wrapped. A Supabase connection drop mid-request throws a raw Prisma error with no JSON body.
+
+2. **GitHub error conflation** — all non-404 GitHub errors collapse into a generic 502. A 403 (wrong OAuth scope) looks identical to a server crash from the frontend's perspective.
+
+3. **No structured logging** — none of the API routes use `console.error` with context. No way to trace which route, user, or upstream service failed in production.
+
+4. **Prisma startup** — `lib/prisma.ts` initializes with no error boundary. If `DATABASE_URL` is malformed or Supabase unreachable, the error surfaces as a raw exception through every route that imports prisma.
+
+### Status
+✅ Audit complete — all backend files reviewed
+❌ Fixes pending implementation
