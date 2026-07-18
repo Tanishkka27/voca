@@ -310,3 +310,21 @@ Rewrite it completely without those words or any close synonyms of them. Keep th
 
 ${buildUserPrompt(activity, style)}`
 }
+
+export interface StructureCheckResult {
+  pass: boolean
+  failures: string[]
+}
+
+const OUTCOME_FIRST_SIGNALS = [
+  'excited',
+  'proud',
+  'thrilled',
+  'happy to share',
+  'just shipped',
+  'finally launched',
+  'i shipped',
+  'we shipped',
+  'announcing',
+  'introducing',
+]

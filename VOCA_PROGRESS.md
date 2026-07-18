@@ -518,3 +518,237 @@ All 5 final drafts passed validation successfully. Below is the detailed breakdo
 ### Status:
 ✅ E2E generation verified on 5 real PRs with Groq fallback. Ready for merge.
 
+---
+
+## VOC-126 — Generation Layer (Parallel 3-Style Draft Generation)
+
+### Owner: @Tanishkka27 — Generation Logic
+
+**Scope**: Claude/Groq orchestration layer. Can Voca reliably create 3 different posts in parallel?
+
+---
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `types/generation.ts` | [NEW] Defines `DraftSuccess`, `DraftError`, `GenerationResult` |
+| `services/content.service.ts` | [MODIFIED] Added `generateAllDrafts()`, `withTimeout()` |
+
+---
+
+### Implementation Summary
+
+- `generateAllDrafts(activity)` fires all 3 styles (`raw`, `polished`, `short`) **simultaneously** using `Promise.allSettled` — never sequentially.
+- Each individual call is wrapped in `withTimeout()` — a `Promise.race` against a 20s timer. If a single style exceeds 20s it resolves as a `DraftError`, not a crash.
+- If 1 or 2 styles fail, the remaining successful drafts are still returned. If all 3 fail, returns an empty `drafts[]` with 3 errors — never throws.
+- Wall time is measured and logged via `console.info` on every call.
+- Zero `any` types. `tsc --noEmit` passes clean.
+
+---
+
+### Test Results — `scripts/test-voc126.ts` (run 2026-07-10)
+
+**Provider**: Groq (`llama-3.3-70b-versatile`, default)
+**Activity used**: `fix: resolve race condition in session token refresh`
+
+#### TEST 1 — Normal run: all 3 styles in parallel
+
+```
+Wall time: 3943ms
+drafts  : 3
+errors  : 0
+
+✅ [RAW]      (206 words) — opens with "we were getting killed by random logouts, no idea what was causing it..."
+✅ [POLISHED] (271 words) — opens with "random logouts were killing me. we'd get these weird reports..."
+✅ [SHORT]    (93 words)  — opens with "Random logouts were killing me. I mean users were just getting kicked out..."
+
+Result: ✅ PASS
+Styles returned: raw, polished, short
+Within 25s budget: ✅ YES (3943ms)
+```
+
+#### TEST 2 — Partial failure shape: one style fails, others still returned
+
+```
+drafts[0].success === true   : ✅
+errors[0].success === false  : ✅
+errors[1].success === false  : ✅
+generatedAt is ISO string    : ✅
+activitySummary echoed back  : ✅
+
+Result: ✅ PASS
+```
+
+#### TEST 3 — Structure guarantees: all 3 styles present, no duplicates
+
+```
+All 3 styles accounted for : ✅
+No duplicate styles        : ✅
+Styles found: raw, polished, short
+Wall time (second run): 3191ms
+
+Result: ✅ PASS
+```
+
+---
+
+### Performance
+
+| Metric | Target | Actual |
+|---|---|---|
+| Total wall time (3 styles parallel) | < 25s | **3943ms** ✅ |
+| Per-draft timeout threshold | 20s | Configured via `DRAFT_TIMEOUT_MS = 20_000` |
+| Parallelism | All 3 simultaneous | Confirmed via `Promise.allSettled` |
+
+---
+
+### Status:
+
+✅ Generation layer complete. All 3 tests passed. `tsc --noEmit` clean.
+
+---
+
+## VOC-126 — API Integration (Partner's side — merged into feat/voc-126)
+
+### What was added
+
+Partner (`@p4rths1105`) pushed branch `parth-voc-126-api-integration` with:
+- `types/generation.ts` — `GenerationResult`, `DraftSuccess`, `DraftError` interfaces
+- `pages/api/generate.ts` — POST route skeleton
+- `services/prompts.ts` — `checkStructure` added (already present in our branch)
+
+### Integration decision
+
+Rather than merging the entire partner branch (which would conflict on `prompts.ts`
+and `types/generation.ts` already committed on `feat/voc-126`), the API route was
+authored directly on `feat/voc-126` incorporating partner's logic with the following
+improvements:
+
+- **Zero `any` types** — `authOptions as any`, `session as any`, `e: any` all removed
+- **Typed session resolution** — `session.user` destructured with explicit `{ id, email }` type assertion
+- **Private/404 repo** — GitHub 404 errors surfaced as a clear 404 + user-friendly message (not a 500/502)
+- **Typed response union** — handler typed as `NextApiResponse<GenerationResult | ErrorResponse | NoActivityResponse>`
+- **`tsc --noEmit` clean** — verified after writing the file
+
+### Endpoint behaviour
+
+| Scenario | HTTP status | Body |
+|---|---|---|
+| Not authenticated | 401 | `{ error: "Unauthorized" }` |
+| No accessToken in DB | 403 | `{ error: "Missing access token…" }` |
+| No repo selected | 404 | `{ error: "No repository selected…" }` |
+| Private/not-found repo | 404 | `{ error: "Repository … was not found or you don't have access…" }` |
+| No recent activity | 200 | `{ noActivity: true, message: "No recent activity found" }` |
+| All 3 drafts generated | 200 | Full `GenerationResult` |
+| Non-method | 405 | `{ error: "Method not allowed" }` |
+
+### TypeScript check
+
+```
+npx tsc --noEmit
+→ (no output — clean)
+```
+
+### Status:
+
+✅ VOC-126 fully complete — generation layer + API route both on `feat/voc-126`.
+`tsc --noEmit` clean. Ready for end-to-end curl verification once dev server is running.
+
+---
+
+## VOC-126 — End-to-End Pipeline Test
+
+**Date:** 2026-07-12T02:37:38Z  
+**Script:** `scripts/e2e-voc126.ts`  
+**Repo:** `Tanishkka27/voca`  
+**Provider:** groq (default)
+
+### Method
+
+OAuth login unavailable locally (OAuth app registered under a third-party GitHub account).  
+Script directly exercises the identical service chain that `POST /api/generate` calls internally:
+
+```
+GitHub API → ActivitySummary → generateAllDrafts(activity)
+```
+
+Auth layer (401 path) separately verified by partner (@p4rths1105).
+
+### Raw Output
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║         VOC-126 — End-to-End Pipeline Test                  ║
+╚══════════════════════════════════════════════════════════════╝
+
+Repo     : Tanishkka27/voca
+Provider : groq (default)
+Time     : 2026-07-12T02:37:38.318Z
+
+STEP 1 — Fetch PRs + commits from GitHub API
+GitHub fetch done in 858ms
+  PRs found    : 0
+  Commits found: 18
+
+STEP 2 — Build ActivitySummary
+Activity summary:
+  pr_title      : (none — commit-based session)
+  what_changed  : docs: comprehensive README for Product Team B — setup, structure, build order, team guide
+  commit_count  : 3
+  notable_commits: docs: comprehensive README for Product Team B | Update README.md
+
+STEP 3 — generateAllDrafts (raw + polished + short in parallel)
+[VOC-126] generateAllDrafts: all 3 styles settled in 1434ms
+
+All styles settled in 1435ms
+drafts : 3
+errors : 0
+generatedAt: 2026-07-12T02:37:40.613Z
+
+✅ [RAW]  (189 words)
+so I just spent way too long trying to get our team docs in order, specifically for
+Product Team B, and I'm not even sure if it's done right yet. docs were a mess, no idea
+where to start. I mean we had nothing, so I figured I'd just start with a comprehensive
+README, get everything in one place, you know, setup, structure, build order, the whole
+team guide...
+
+✅ [POLISHED]  (167 words)
+I've been hitting my head against the wall trying to get our Product Team B setup docs
+in order. it's a mess. we've had a few people switch roles and it's been tough to keep
+everything straight. I spent way too much time digging through old commits...
+
+✅ [SHORT]  (63 words)
+trying to get Product Team B up to speed was a nightmare. not sure what was more painful,
+the outdated setup or the missing build order docs. finally pushed that PR with a
+comprehensive README, pretty sure it's what we needed...
+
+STEP 4 — Acceptance Criteria
+  ✅  All 3 styles accounted for
+  ✅  No duplicate styles
+  ✅  generatedAt is ISO string
+  ✅  activitySummary echoed back
+  ✅  Within 25s budget
+  ✅  At least 1 draft succeeded
+  ✅  drafts have success: true
+  ✅  errors have success: false
+
+SUMMARY
+Styles succeeded : raw, polished, short
+Styles failed    : none
+Wall time        : 1435ms  (budget <25000ms) ✅
+Overall result   : ✅ PASS
+```
+
+### Performance
+
+| Metric | Target | Actual |
+|---|---|---|
+| Total wall time (3 styles parallel) | < 25s | **1435ms** ✅ |
+| Per-draft timeout threshold | 20s | `DRAFT_TIMEOUT_MS = 20_000` configured |
+| Parallelism | All 3 simultaneous | Confirmed via `Promise.allSettled` |
+
+### Status:
+
+✅ **VOC-126 DONE** — All acceptance criteria met. e2e pipeline verified. `tsc --noEmit` clean.
+
