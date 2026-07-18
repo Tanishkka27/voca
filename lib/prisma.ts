@@ -12,7 +12,7 @@ if (process.env.NODE_ENV !== 'production') global.prisma = prisma
 // unreachable Supabase instance would otherwise stay silent until whichever
 // request happens to run first. Eagerly connecting at import time surfaces
 // that failure in the server logs immediately instead.
-prisma.$connect().catch((err) => {
+prisma.$connect().catch((err: unknown) => {
   console.error('[lib/prisma]', {
     message: 'Failed to connect to the database at startup',
     error: err instanceof Error ? err.message : String(err),

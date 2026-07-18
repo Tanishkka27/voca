@@ -1,5 +1,8 @@
 import type { NextApiResponse } from 'next'
-import { Prisma } from '@prisma/client'
+import {
+  PrismaClientInitializationError,
+  PrismaClientKnownRequestError,
+} from '@prisma/client/runtime/library'
 
 /**
  * Standard error response shape returned by every API route on failure.
@@ -112,7 +115,7 @@ const PRISMA_CONNECTION_CODES = new Set(['P1001', 'P1002', 'P1008', 'P1017'])
  * DB failures never surface as a raw stack trace with no JSON body.
  */
 export function classifyPrismaError(err: unknown): ClassifiedError | null {
-  if (err instanceof Prisma.PrismaClientInitializationError) {
+  if (err instanceof PrismaClientInitializationError) {
     return {
       status: 503,
       code: 'PRISMA_CONNECTION',
@@ -120,15 +123,16 @@ export function classifyPrismaError(err: unknown): ClassifiedError | null {
     }
   }
 
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    if (PRISMA_CONNECTION_CODES.has(err.code)) {
+  if (err instanceof PrismaClientKnownRequestError) {
+    const prismaErr = err as PrismaClientKnownRequestError
+    if (PRISMA_CONNECTION_CODES.has(prismaErr.code)) {
       return {
         status: 503,
         code: 'PRISMA_CONNECTION',
         message: 'The database connection was lost mid-request. Please try again.',
       }
     }
-    if (err.code === 'P2025') {
+    if (prismaErr.code === 'P2025') {
       return {
         status: 404,
         code: 'PRISMA_NOT_FOUND',

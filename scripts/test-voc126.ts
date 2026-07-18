@@ -91,8 +91,8 @@ async function testPartialFailure() {
   const fakeResult: GenerationResult = {
     drafts: [{ style: 'raw', content: 'test post', success: true }],
     errors: [
-      { style: 'polished', error: 'Draft generation failed validation after retry', success: false },
-      { style: 'short', error: 'Draft generation timed out after 20s (style=short)', success: false },
+      { style: 'polished', error: 'Draft generation failed validation after retry', code: 'DRAFT_VALIDATION_FAILED', success: false },
+      { style: 'short', error: 'Draft generation timed out after 20s (style=short)', code: 'DRAFT_TIMEOUT', success: false },
     ],
     generatedAt: new Date().toISOString(),
     activitySummary: MOCK_ACTIVITY,

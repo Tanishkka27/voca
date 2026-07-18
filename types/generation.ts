@@ -9,7 +9,7 @@ export interface DraftSuccess {
 export interface DraftError {
   style: 'raw' | 'polished' | 'short';
   error: string;
-  code?: string;
+  code: string;
   success: false;
 }
 
