@@ -2,6 +2,7 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import { type NextAuthOptions } from "next-auth"
 import GithubProvider from "next-auth/providers/github"
 import prisma from "@/lib/prisma"
+import { logError } from "@/lib/errors"
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma as any),
@@ -42,8 +43,13 @@ export const authOptions: NextAuthOptions = {
             },
           })
         }
-      } catch (e) {
-        // safe-ignore: user might not exist yet or adapter already created it
+      } catch (err) {
+        // Non-fatal: user might not exist yet or the adapter already created
+        // it. Still logged so a real DB failure here isn't invisible.
+        logError('auth', 'Failed to persist GitHub access token on sign-in', {
+          userId: user.id,
+          message: err instanceof Error ? err.message : String(err),
+        })
       }
     },
   },
