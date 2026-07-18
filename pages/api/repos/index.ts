@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma'
 import { fetchUserRepos } from '@/services/github.service'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions as any)
+  const session = (await getServerSession(req, res, authOptions as any)) as any
   if (!session || !session.user) return res.status(401).json({ error: 'Unauthorized' })
 
   // get access token from DB (do not rely on client session)
